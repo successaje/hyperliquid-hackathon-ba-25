@@ -29,6 +29,10 @@ export const Lava = {
   netVersion: async (): Promise<string> => callRpc("net_version", []),
   clientVersion: async (): Promise<string> => callRpc("web3_clientVersion", []),
   syncing: async (): Promise<any> => callRpc("eth_syncing", []),
+  blockNumber: async (): Promise<number> => {
+    const hex = await callRpc<string>("eth_blockNumber", []);
+    return typeof hex === "string" && hex.startsWith("0x") ? parseInt(hex, 16) : Number(hex);
+  },
 
   getLatestBlocks: async (): Promise<any[]> => {
     try {

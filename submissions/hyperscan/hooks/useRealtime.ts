@@ -4,58 +4,92 @@ import { useCallback, useRef } from "react";
 import { useExplorerStore } from "../lib/store";
 import { ExplorerBlock, ExplorerTx } from "../utils/types";
 import { Lava } from "../lib/lavaClient";
-import { RealtimeClient } from "../lib/realtime";
 
 export function useRealtime() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const wsRef = useRef<RealtimeClient | null>(null);
   const { setBlocks, setTxs, setPendingTxs, setMetrics } = useExplorerStore();
 
   const poll = useCallback(async () => {
     try {
-      const [rawBlocks, rawTxs, pending, metrics] = await Promise.all([
-        Lava.getLatestBlocks(),
-        Lava.getRecentTransactions(50),
-        Lava.getPendingTransactions(50),
-        Lava.getNetworkMetrics(),
-      ]);
+      // Derive latest blocks & txs from standard eth_* calls
+      const latestNum = await Lava.blockNumber();
 
-      const blocks: ExplorerBlock[] = Array.isArray(rawBlocks)
-        ? rawBlocks.map((b: any, i: number) => ({
-            height: Number(b.height ?? b.number ?? b.block_number ?? i),
-            hash: String(b.hash ?? b.block_hash ?? b.id ?? `0xblock${i}`),
-            timestamp: new Date(
-              Number(b.timestamp ?? b.time ?? Date.now() - i * 6000)
-            ).toISOString(),
-          }))
-        : [];
+      const blockPromises: Promise<any>[] = [];
+      const windowSize = 10;
+      for (let i = 0; i < windowSize; i++) {
+        const height = latestNum - i;
+        if (height < 0) break;
+        blockPromises.push(Lava.getBlockByNumber(height, true));
+      }
+      const rawBlocks = (await Promise.all(blockPromises)).filter(Boolean);
 
-      const txs: ExplorerTx[] = Array.isArray(rawTxs)
-        ? rawTxs.map((t: any, i: number) => ({
-            hash: String(t.hash ?? t.tx_hash ?? t.id ?? ""),
-            type: String(t.type ?? t.kind ?? "tx"),
-            timestamp: new Date(
-              Number(t.timestamp ?? t.time ?? Date.now() - i * 3000)
-            ).toISOString(),
-          }))
-        : [];
+      const blocks: ExplorerBlock[] = rawBlocks.map((b: any) => {
+        const tsMs = b.timestamp ? parseInt(b.timestamp, 16) * 1000 : Date.now();
+        return {
+          height: Number(b.number ? parseInt(b.number, 16) : 0),
+          hash: String(b.hash ?? b.blockHash ?? "0x"),
+          timestamp: new Date(tsMs).toISOString(),
+        };
+      });
 
-      const ptxs: ExplorerTx[] = Array.isArray(pending)
-        ? pending.map((t: any, i: number) => ({
-            hash: String(t.hash ?? t.tx_hash ?? t.id ?? ""),
-            type: String(t.type ?? t.kind ?? "pending"),
-            timestamp: new Date(
-              Number(t.timestamp ?? t.time ?? Date.now() - i * 1000)
-            ).toISOString(),
-          }))
-        : [];
+      const txs: ExplorerTx[] = rawBlocks.flatMap((b: any) => {
+        const tsMs = b.timestamp ? parseInt(b.timestamp, 16) * 1000 : Date.now();
+        if (Array.isArray(b.transactions)) {
+          return b.transactions.map((t: any) => {
+            const hash = typeof t === "string" ? t : t?.hash;
+            if (!hash) return null;
+            return {
+              hash,
+              type: "tx",
+              timestamp: new Date(tsMs).toISOString(),
+            } as ExplorerTx;
+          }).filter(Boolean) as ExplorerTx[];
+        }
+        return [];
+      });
 
-      // No placeholder fallback; if empty, leave existing UI until next poll
-
-      if (blocks.length) setBlocks(blocks);
-      if (txs.length) setTxs(txs);
-      setPendingTxs(ptxs);
-      setMetrics(metrics);
+      // No pending txs without a mempool-specific RPC; leave empty for now
+      setBlocks(blocks);
+      setTxs(txs.slice(0, 50));
+      setPendingTxs([]);
+      // Derive basic metrics: TPS, latest block, avg gas
+      if (rawBlocks.length) {
+        const timestamps = rawBlocks
+          .map((b: any) => (b.timestamp ? parseInt(b.timestamp, 16) * 1000 : undefined))
+          .filter((v: any) => typeof v === "number") as number[];
+        const totalTxs = txs.length;
+        let tps = 0;
+        let blockTimeMs = 0;
+        if (timestamps.length >= 2) {
+          const min = Math.min(...timestamps);
+          const max = Math.max(...timestamps);
+          const spanSec = (max - min) / 1000;
+          if (spanSec > 0) {
+            tps = totalTxs / spanSec;
+            blockTimeMs = (spanSec / rawBlocks.length) * 1000;
+          } else {
+            tps = totalTxs;
+          }
+        }
+        // Avg gas per tx
+        let gasUsedTotal = 0;
+        rawBlocks.forEach((b: any) => {
+          const gu = b.gasUsed || b.gas_used;
+          if (typeof gu === "string" && gu.startsWith("0x")) {
+            gasUsedTotal += parseInt(gu, 16);
+          } else if (typeof gu === "number") {
+            gasUsedTotal += gu;
+          }
+        });
+        const gasAvg = totalTxs > 0 ? gasUsedTotal / totalTxs : 0;
+        setMetrics({
+          tps: Number.isFinite(tps) ? Number(tps.toFixed(2)) : 0,
+          pending: 0,
+          latestBlock: latestNum,
+          gasAvg: Math.round(gasAvg),
+          blockTimeMs: Number.isFinite(blockTimeMs) ? blockTimeMs : 0,
+        });
+      }
     } catch (e) {
       // swallow errors in polling
     }
@@ -63,45 +97,15 @@ export function useRealtime() {
 
   const start = useCallback(() => {
     if (timerRef.current) return;
-    // Try websocket
-    wsRef.current = new RealtimeClient({
-      onBlock: (b) => {
-        const block: ExplorerBlock = {
-          height: Number(b.height ?? b.number ?? 0),
-          hash: String(b.hash ?? b.block_hash ?? "0x"),
-          timestamp: new Date(Number(b.timestamp ?? Date.now())).toISOString(),
-        };
-        setBlocks([block]);
-      },
-      onTx: (t) => {
-        const tx: ExplorerTx = {
-          hash: String(t.hash ?? t.tx_hash ?? "0x"),
-          type: String(t.type ?? "tx"),
-          timestamp: new Date(Number(t.timestamp ?? Date.now())).toISOString(),
-        };
-        setTxs([tx]);
-      },
-      onPendingTx: (t) => {
-        const tx: ExplorerTx = {
-          hash: String(t.hash ?? t.tx_hash ?? "0x"),
-          type: "pending",
-          timestamp: new Date().toISOString(),
-        };
-        setPendingTxs([tx]);
-      },
-    });
-    try { wsRef.current.start(); } catch {}
     void poll();
     timerRef.current = setInterval(poll, 5_000);
-  }, [poll, setBlocks, setTxs, setPendingTxs]);
+  }, [poll]);
 
   const stop = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    wsRef.current?.stop();
-    wsRef.current = null;
   }, []);
 
   return { start, stop };
