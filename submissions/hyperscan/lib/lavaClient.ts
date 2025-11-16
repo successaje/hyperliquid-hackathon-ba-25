@@ -69,19 +69,16 @@ export const Lava = {
       }
       return [];
     } catch {
-      // Placeholder demo balances
-      return [
-        { asset: "USDC", balance: 12345.67 },
-        { asset: "HYPE", balance: 4200 },
-        { asset: "ETH", balance: 1.25 },
-      ];
+      // If the node doesn't support address_balances, we can't infer all token holdings
+      // without an indexer. Return empty and let the UI show "No balances".
+      return [];
     }
   },
   getTransaction: async (hash: string): Promise<any> => {
     try {
-      return await callRpc<any>("tx_get", [hash]);
+      return await callRpc<any>("eth_getTransactionByHash", [hash]);
     } catch (e) {
-      return { hash, note: "tx_get not implemented in placeholder" };
+      return { hash, note: "eth_getTransactionByHash failed" };
     }
   },
   getTransactionReceipt: async (hash: string): Promise<any> => {

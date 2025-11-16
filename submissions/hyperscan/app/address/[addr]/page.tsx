@@ -11,7 +11,6 @@ export default function AddressPage() {
   const addr = String(params?.addr ?? "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<any>(null);
   const [balances, setBalances] = useState<Array<{ asset: string; balance: number }>>([]);
   const [nativeBalance, setNativeBalance] = useState<string>("");
 
@@ -21,12 +20,10 @@ export default function AddressPage() {
       setLoading(true);
       setError(null);
       try {
-        const [res, bals, wei] = await Promise.all([
-          Lava.getAddress(addr),
+        const [bals, wei] = await Promise.all([
           Lava.getAddressBalances(addr),
           Lava.getBalance(addr, "latest"),
         ]);
-        if (alive) setData(res);
         if (alive) setBalances(bals);
         if (alive) {
           const v = typeof wei === "string" && wei.startsWith("0x") ? parseInt(wei, 16) : Number(wei);
@@ -53,7 +50,9 @@ export default function AddressPage() {
         {loading && <div className="text-sm text-white/60">Loading…</div>}
         {error && <div className="text-sm text-red-400">{error}</div>}
         {!loading && !error && (
-          <pre className="text-xs overflow-auto">{JSON.stringify(data, null, 2)}</pre>
+          <div className="text-sm opacity-70">
+            Address activity and labels will appear here as we add more Hyperliquid indexing.
+          </div>
         )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

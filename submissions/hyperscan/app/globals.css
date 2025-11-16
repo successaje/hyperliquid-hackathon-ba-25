@@ -8,8 +8,8 @@
   --color-fg: #101826;
   --color-primary: #00bcd4;
   --color-accent: #7c3aed;
-  --color-surface: rgba(0,0,0,0.03);
-  --color-border: rgba(0,0,0,0.08);
+  --color-surface: rgba(255,255,255,0.9);
+  --color-border: rgba(0,0,0,0.14);
 }
 
 .dark {
@@ -28,6 +28,26 @@ html, body {
 html { background-color: var(--color-bg); color: var(--color-fg); }
 body { @apply bg-background text-foreground antialiased transition-colors duration-200; }
 
-.card { @apply rounded-xl backdrop-blur shadow-soft; background: var(--color-surface); border: 1px solid var(--color-border); }
+.card { @apply rounded-xl backdrop-blur shadow-soft transition-all duration-200; background: var(--color-surface); border: 1px solid var(--color-border); }
+.card:hover { box-shadow: 0 12px 28px rgba(0,0,0,0.12); }
+.dark .card:hover { box-shadow: 0 12px 28px rgba(0,0,0,0.35); }
+
+/* Table rows hover */
+table tr:hover { background: rgba(0,0,0,0.03); }
+.dark table tr:hover { background: rgba(255,255,255,0.04); }
+
+/* Glass header */
+.glass {
+  background: linear-gradient(to bottom, rgba(255,255,255,0.6), rgba(255,255,255,0.2));
+  backdrop-filter: saturate(140%) blur(8px);
+}
+.dark .glass {
+  background: linear-gradient(to bottom, rgba(11,15,23,0.9), rgba(11,15,23,0.5));
+}
+
+/* Glow accent */
+.glow {
+  box-shadow: 0 0 0 1px rgba(0,224,255,0.15), 0 0 24px rgba(0,224,255,0.12);
+}
 
 

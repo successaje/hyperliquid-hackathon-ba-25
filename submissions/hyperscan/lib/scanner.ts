@@ -11,6 +11,12 @@ export type ContractScanResult = {
     info?: string;
   }>;
   metadata?: Record<string, any>;
+  anomalies?: Array<{
+    id: string;
+    label: string;
+    severity: "low" | "medium" | "high";
+    detail?: string;
+  }>;
 };
 
 const BytecodeInfo = z.object({
@@ -30,8 +36,54 @@ export async function fetchContractBytecode(address: string): Promise<z.infer<ty
   };
 }
 
+async function detectErc20Anomalies(address: string): Promise<ContractScanResult["anomalies"]> {
+  try {
+    // ERC20 Transfer topic
+    const transferTopic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+    const nowHex = "latest";
+    const fromBlock = "0x0";
+    // @ts-ignore next-line: dynamic import to avoid circular deps
+    const { Lava } = await import("./lavaClient");
+    const logs = await Lava.getLogs({
+      fromBlock,
+      toBlock: nowHex,
+      address,
+      topics: [transferTopic],
+    });
+    if (!Array.isArray(logs) || logs.length === 0) return [];
+    // Heuristics: detect single whale dominance and burst transfers
+    const toCounts = new Map<string, number>();
+    for (const l of logs) {
+      const to = Array.isArray(l.topics) && l.topics.length >= 3 ? l.topics[2] : undefined;
+      if (to) toCounts.set(to, (toCounts.get(to) ?? 0) + 1);
+    }
+    const maxCount = Math.max(0, ...Array.from(toCounts.values()));
+    const anomalies: ContractScanResult["anomalies"] = [];
+    if (maxCount > Math.max(20, logs.length * 0.2)) {
+      anomalies.push({
+        id: "whale-dominance",
+        label: "Whale destination dominance",
+        severity: "medium",
+        detail: "Large proportion of transfers to a single address. Investigate distribution risk.",
+      });
+    }
+    if (logs.length > 2000) {
+      anomalies.push({
+        id: "transfer-surge",
+        label: "Transfer surge detected",
+        severity: "low",
+        detail: "High volume of transfers observed; verify no spam/airdrop abuse.",
+      });
+    }
+    return anomalies;
+  } catch {
+    return [];
+  }
+}
+
 export async function scanContract(address: string): Promise<ContractScanResult> {
   const meta = await fetchContractBytecode(address);
+  const anomalies = await detectErc20Anomalies(address);
 
   const checks: ContractScanResult["checks"] = [];
 
@@ -68,6 +120,7 @@ export async function scanContract(address: string): Promise<ContractScanResult>
     healthScore,
     checks,
     metadata: meta,
+    anomalies,
   };
 }
 

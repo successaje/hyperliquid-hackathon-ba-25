@@ -22,24 +22,10 @@ export function TokenFlow({ address }: { address: string }) {
       setLoading(true);
       setError(null);
       try {
-        // Placeholder data. Replace with Lava token flow aggregation.
-        const demoNodes: Node[] = [
-          { name: address.slice(0, 8) + "…" },
-          { name: "Whale A" },
-          { name: "Whale B" },
-          { name: "DEX" },
-          { name: "Custody" },
-        ];
-        const demoLinks: Link[] = [
-          { source: 0, target: 1, value: 120 },
-          { source: 1, target: 3, value: 80 },
-          { source: 0, target: 2, value: 50 },
-          { source: 2, target: 4, value: 40 },
-          { source: 3, target: 4, value: 30 },
-        ];
+        // TODO: implement Lava-powered token flow graph.
         if (alive) {
-          setNodes(demoNodes);
-          setLinks(demoLinks);
+          setNodes([]);
+          setLinks([]);
         }
       } catch (e: any) {
         if (alive) setError(e?.message ?? "Failed to load token flow");
@@ -75,7 +61,7 @@ export function TokenFlow({ address }: { address: string }) {
 
   if (loading) return <div className="text-sm text-white/60">Loading token flows…</div>;
   if (error) return <div className="text-sm text-red-400">{error}</div>;
-  if (!nodes.length) return <div className="text-sm text-white/60">No token flow data.</div>;
+  if (!nodes.length) return <div className="text-sm text-white/60">Token flow visualization coming soon.</div>;
 
   return container;
 }

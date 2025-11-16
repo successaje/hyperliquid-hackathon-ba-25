@@ -37,13 +37,15 @@ export default function TxPage() {
     };
   }, [hash]);
 
+  const notFound = !loading && !error && !data && !receipt;
+
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Transaction</h1>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="card p-4 space-y-3">
           <div className="text-xs break-all">{hash}</div>
-          {!loading && !error && (
+          {!loading && !error && !notFound && (
             <div className="space-y-2 text-sm">
               <div>Status: <span className={receipt?.status ? "text-green-400" : "text-red-400"}>{receipt?.status ? "Success" : "Failed"}</span></div>
               <div>Block: <span className="opacity-80">{receipt?.blockNumber ?? data?.blockNumber}</span></div>
@@ -53,10 +55,11 @@ export default function TxPage() {
               <div>Timestamp: <span className="opacity-80">{data?.timestamp ?? ""}</span></div>
             </div>
           )}
+          {notFound && <div className="text-sm opacity-70">Transaction not found on Hyperliquid testnet.</div>}
         </div>
         <div className="card p-4 space-y-3">
           <h2 className="text-lg font-semibold">Transfers & Parties</h2>
-          {!loading && !error && (
+          {!loading && !error && !notFound && (
             <div className="space-y-1 text-sm">
               <div>From: <span className="opacity-80 break-all">{data?.from}</span></div>
               <div>To: <span className="opacity-80 break-all">{data?.to}</span></div>
@@ -64,7 +67,7 @@ export default function TxPage() {
           )}
         </div>
       </div>
-      {!loading && !error && (
+      {!loading && !error && !notFound && (
         <div className="card p-4 space-y-3">
           <h2 className="text-lg font-semibold">Logs</h2>
           {Array.isArray(receipt?.logs) && receipt.logs.length ? (

@@ -32,7 +32,7 @@ export function useRealtime() {
 
       const txs: ExplorerTx[] = Array.isArray(rawTxs)
         ? rawTxs.map((t: any, i: number) => ({
-            hash: String(t.hash ?? t.tx_hash ?? t.id ?? `0xtx${i}`),
+            hash: String(t.hash ?? t.tx_hash ?? t.id ?? ""),
             type: String(t.type ?? t.kind ?? "tx"),
             timestamp: new Date(
               Number(t.timestamp ?? t.time ?? Date.now() - i * 3000)
@@ -42,31 +42,18 @@ export function useRealtime() {
 
       const ptxs: ExplorerTx[] = Array.isArray(pending)
         ? pending.map((t: any, i: number) => ({
-            hash: String(t.hash ?? t.tx_hash ?? t.id ?? `0xptx${i}`),
+            hash: String(t.hash ?? t.tx_hash ?? t.id ?? ""),
             type: String(t.type ?? t.kind ?? "pending"),
-            timestamp: new Date().toISOString(),
+            timestamp: new Date(
+              Number(t.timestamp ?? t.time ?? Date.now() - i * 1000)
+            ).toISOString(),
           }))
         : [];
 
-      if (!blocks.length && !txs.length) {
-        const now = Date.now();
-        const fallbackBlocks: ExplorerBlock[] = Array.from({ length: 10 }).map((_, i) => ({
-          height: 100000 + i,
-          hash: `0xblock${i.toString(16)}${now.toString(16)}`,
-          timestamp: new Date(now - i * 6000).toISOString(),
-        }));
-        const fallbackTxs: ExplorerTx[] = Array.from({ length: 15 }).map((_, i) => ({
-          hash: `0xtx${i.toString(16)}${now.toString(16)}`,
-          type: i % 3 === 0 ? "transfer" : i % 3 === 1 ? "order" : "cancel",
-          timestamp: new Date(now - i * 3000).toISOString(),
-        }));
-        setBlocks(fallbackBlocks);
-        setTxs(fallbackTxs);
-        return;
-      }
+      // No placeholder fallback; if empty, leave existing UI until next poll
 
-      setBlocks(blocks);
-      setTxs(txs);
+      if (blocks.length) setBlocks(blocks);
+      if (txs.length) setTxs(txs);
       setPendingTxs(ptxs);
       setMetrics(metrics);
     } catch (e) {
