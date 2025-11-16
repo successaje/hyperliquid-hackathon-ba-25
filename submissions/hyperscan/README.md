@@ -4,6 +4,15 @@ HyperScan is a next‑generation explorer for the Hyperliquid testnet, built on 
 
 ---
 
+## Submission
+
+This project is submitted for the **Lava track** of the Hyperliquid hackathon.
+
+Demo / overview video:  
+[HyperScan – Lava‑powered Hyperliquid Explorer (Canva link)](https://www.canva.com/design/DAG44esHzzs/x7a30PlqYoG1xx-XoiiB5w/edit?utm_content=DAG44esHzzs&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
+
+---
+
 ## Features
 
 - **Live Network Dashboard**
