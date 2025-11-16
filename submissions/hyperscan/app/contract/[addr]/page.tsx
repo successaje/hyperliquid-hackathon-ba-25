@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Lava } from "../../../lib/lavaClient";
 import { ContractHealth } from "../../../components/contract/ContractHealth";
+import { scanContract } from "../../../lib/scanner";
+import { Badge } from "../../../components/ui/Badge";
 
 export default function ContractPage() {
   const params = useParams();
@@ -11,17 +13,35 @@ export default function ContractPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
+  const [codePreview, setCodePreview] = useState<string | null>(null);
+  const [scan, setScan] = useState<Awaited<ReturnType<typeof scanContract>> | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       setLoading(true);
       setError(null);
+       setScanError(null);
       try {
-        const res = await Lava.getContract(addr);
-        if (alive) setData(res);
+        const [res, bytecode, scanRes] = await Promise.all([
+          Lava.getContract(addr),
+          Lava.getContractBytecode(addr),
+          scanContract(addr),
+        ]);
+        if (!alive) return;
+        setData(res);
+        if (bytecode && bytecode !== "0x") {
+          setCodePreview(String(bytecode).slice(0, 260) + (String(bytecode).length > 260 ? "…" : ""));
+        } else {
+          setCodePreview(null);
+        }
+        setScan(scanRes);
       } catch (e: any) {
-        if (alive) setError(e?.message ?? "Failed to fetch contract");
+        if (!alive) return;
+        const msg = e?.message ?? String(e);
+        setError("Failed to fetch contract");
+        setScanError(msg);
       } finally {
         if (alive) setLoading(false);
       }
@@ -31,11 +51,22 @@ export default function ContractPage() {
     };
   }, [addr]);
 
+  const score = scan?.healthScore ?? 0;
+  const riskColor = score >= 80 ? "green" : score >= 60 ? "yellow" : "red";
+
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Contract</h1>
-      <div className="card p-4">
-        <div className="text-xs break-all">{addr}</div>
+      <div className="card p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold">Contract</h1>
+          <div className="text-xs break-all opacity-80">{addr}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge color="blue">HyperEVM</Badge>
+          {scan && (
+            <Badge color={riskColor}>Health: {score}/100</Badge>
+          )}
+        </div>
       </div>
       <div className="card p-4">
         {loading && <div className="text-sm text-white/60">Loading…</div>}
@@ -44,10 +75,69 @@ export default function ContractPage() {
           <pre className="text-xs overflow-auto">{JSON.stringify(data, null, 2)}</pre>
         )}
       </div>
-      <div className="card p-4">
-        <h2 className="text-lg font-semibold mb-2">Contract Health</h2>
-        <ContractHealth address={addr} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="card p-4 space-y-3">
+          <h2 className="text-lg font-semibold mb-1">Contract Health</h2>
+          <p className="text-xs opacity-70 mb-1">
+            This is a demo analysis flow showing how HyperScan inspects code and flags issues.
+          </p>
+          <ContractHealth address={addr} />
+        </div>
+        <div className="card p-4 space-y-3">
+          <h2 className="text-lg font-semibold mb-1">Code Preview (Demo)</h2>
+          {codePreview ? (
+            <pre className="text-[10px] leading-snug overflow-auto">{codePreview}</pre>
+          ) : (
+            <div className="text-xs opacity-70">
+              Unable to fetch bytecode from RPC for this contract. In a full setup, this panel would show verified source or decompiled view.
+            </div>
+          )}
+        </div>
       </div>
+      {scan && (
+        <div className="card p-4 space-y-3">
+          <h2 className="text-lg font-semibold mb-1">Issues & Analysis (Demo)</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="opacity-80">Reentrancy</span>
+                <Badge color="green">Low</Badge>
+              </div>
+              <p className="text-xs opacity-70">
+                No external calls in critical paths detected in demo scan.
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="opacity-80">Access Control</span>
+                <Badge color="yellow">Medium</Badge>
+              </div>
+              <p className="text-xs opacity-70">
+                Admin-like operations found. Ensure only trusted roles can pause/upgrade.
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="opacity-80">Integer Safety</span>
+                <Badge color="green">Low</Badge>
+              </div>
+              <p className="text-xs opacity-70">
+                Solidity ^0.8 checks mitigate overflows, but validate all arithmetic assumptions.
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="opacity-80">Storage & Upgrades</span>
+                <Badge color="red">High</Badge>
+              </div>
+              <p className="text-xs opacity-70">
+                Proxy patterns can introduce storage collisions. Review implementation/logic contract layouts.
+              </p>
+            </div>
+          </div>
+          {scanError && <div className="text-xs text-red-400">Scanner note: {scanError}</div>}
+        </div>
+      )}
     </div>
   );
 }

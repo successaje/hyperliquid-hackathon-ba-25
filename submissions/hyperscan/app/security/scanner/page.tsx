@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { scanContract } from "../../../lib/scanner";
 import { Badge } from "../../../components/ui/Badge";
 
 export default function SecurityScannerPage() {
+  const searchParams = useSearchParams();
   const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Awaited<ReturnType<typeof scanContract>> | null>(null);
+  const [bootstrapped, setBootstrapped] = useState(false);
 
   const runScan = async () => {
     setLoading(true);
@@ -25,6 +28,27 @@ export default function SecurityScannerPage() {
   };
 
   const riskColor = (n: number) => (n >= 80 ? "green" : n >= 60 ? "yellow" : "red");
+
+  useEffect(() => {
+    const preset = searchParams.get("address");
+    if (!bootstrapped && preset) {
+      setAddress(preset);
+      // fire and forget initial scan
+      (async () => {
+        setBootstrapped(true);
+        setLoading(true);
+        setError(null);
+        try {
+          const res = await scanContract(preset.trim());
+          setResult(res);
+        } catch (e: any) {
+          setError(e?.message ?? "Scan failed");
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }
+  }, [bootstrapped, searchParams]);
 
   return (
     <div className="space-y-4">
@@ -92,6 +116,32 @@ export default function SecurityScannerPage() {
                 ))}
               </ul>
               <div className="text-xs opacity-60 mt-2">Heuristic analysis; validate on-chain before acting.</div>
+            </div>
+          )}
+          {!!(result.similar?.length) && (
+            <div className="card p-4">
+              <h2 className="text-lg font-semibold mb-2">Similarity Scan</h2>
+              <p className="text-xs opacity-70 mb-2">
+                These contracts share bytecode or structural similarity with the target. Use this to spot clones, forks, or scam derivatives.
+              </p>
+              <ul className="divide-y divide-white/5 text-sm">
+                {result.similar!.map((s) => (
+                  <li key={s.address} className="py-2 flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className="font-mono text-xs">{s.address}</span>
+                      {s.label && <span className="text-xs opacity-70">{s.label}</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs opacity-80">{s.similarity}% match</span>
+                      {s.risk && (
+                        <Badge color={s.risk === "high" ? "red" : s.risk === "medium" ? "yellow" : "green"}>
+                          {s.risk}
+                        </Badge>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
           <div className="card p-4">

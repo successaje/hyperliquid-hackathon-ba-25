@@ -5,13 +5,22 @@ import { useParams } from "next/navigation";
 import { Lava } from "../../../lib/lavaClient";
 import { TokenFlow } from "../../../components/graphs/TokenFlow";
 import { HoldingsChart } from "../../../components/graphs/HoldingsChart";
+import { HYPER_TOKENS, KnownToken } from "../../../lib/tokens";
+
+function encodeBalanceOfCall(address: string): string {
+  // balanceOf(address) selector: 0x70a08231
+  const selector = "70a08231";
+  const addrNoPrefix = address.toLowerCase().replace(/^0x/, "");
+  const padded = addrNoPrefix.padStart(64, "0");
+  return "0x" + selector + padded;
+}
 
 export default function AddressPage() {
   const params = useParams();
   const addr = String(params?.addr ?? "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [balances, setBalances] = useState<Array<{ asset: string; balance: number }>>([]);
+  const [balances, setBalances] = useState<Array<{ token: KnownToken; balance: number }>>([]);
   const [nativeBalance, setNativeBalance] = useState<string>("");
 
   useEffect(() => {
@@ -20,11 +29,23 @@ export default function AddressPage() {
       setLoading(true);
       setError(null);
       try {
-        const [bals, wei] = await Promise.all([
-          Lava.getAddressBalances(addr),
+        const [wei, ...ercCalls] = await Promise.all([
           Lava.getBalance(addr, "latest"),
+          ...HYPER_TOKENS.map((t) => Lava.ethCall({ to: t.address, data: encodeBalanceOfCall(addr) }, "latest")),
         ]);
-        if (alive) setBalances(bals);
+        if (alive) {
+          const ercBalances = ercCalls.map((raw, idx) => {
+            const token = HYPER_TOKENS[idx];
+            if (typeof raw !== "string" || !raw.startsWith("0x")) return { token, balance: 0 };
+            const bn = BigInt(raw || "0x0");
+            const denom = BigInt(10) ** BigInt(token.decimals);
+            const integer = Number(bn / denom);
+            const fraction = Number(bn % denom) / Number(denom);
+            const val = integer + fraction;
+            return { token, balance: val };
+          }).filter((b) => b.balance > 0);
+          setBalances(ercBalances);
+        }
         if (alive) {
           const v = typeof wei === "string" && wei.startsWith("0x") ? parseInt(wei, 16) : Number(wei);
           setNativeBalance((v / 1e18).toFixed(6) + " ETH");
@@ -62,8 +83,11 @@ export default function AddressPage() {
           {balances.length ? (
             <ul className="text-sm divide-y divide-white/5">
               {balances.map((b) => (
-                <li key={b.asset} className="py-1 flex items-center justify-between">
-                  <span className="opacity-80">{b.asset}</span>
+                <li key={b.token.address} className="py-1 flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="opacity-80">{b.token.symbol}</span>
+                    <span className="text-xs opacity-60">{b.token.name}</span>
+                  </div>
                   <span className="opacity-70">{b.balance.toLocaleString()}</span>
                 </li>
               ))}
@@ -74,7 +98,7 @@ export default function AddressPage() {
         </div>
         <div className="card p-4">
           <h2 className="text-lg font-semibold mb-2">Holdings</h2>
-          <HoldingsChart data={balances} />
+          <HoldingsChart data={balances.map((b) => ({ asset: b.token.symbol, balance: b.balance }))} />
         </div>
       </div>
       <div className="card p-4">

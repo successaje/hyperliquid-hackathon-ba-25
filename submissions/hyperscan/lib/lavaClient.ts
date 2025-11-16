@@ -51,12 +51,9 @@ export const Lava = {
       return [];
     }
   },
-  getAddress: async (address: string): Promise<any> => {
-    try {
-      return await callRpc<any>("address_get", [address]);
-    } catch (e) {
-      return { address, note: "address_get not implemented in placeholder" };
-    }
+  // getAddress kept for future use; currently not used in UI because Hyperliquid RPC doesn't expose it
+  getAddress: async (_address: string): Promise<any> => {
+    return null;
   },
   getAddressBalances: async (address: string): Promise<Array<{ asset: string; balance: number }>> => {
     try {
@@ -78,7 +75,7 @@ export const Lava = {
     try {
       return await callRpc<any>("eth_getTransactionByHash", [hash]);
     } catch (e) {
-      return { hash, note: "eth_getTransactionByHash failed" };
+      return null;
     }
   },
   getTransactionReceipt: async (hash: string): Promise<any> => {
@@ -90,11 +87,9 @@ export const Lava = {
     }
   },
   getContract: async (address: string): Promise<any> => {
-    try {
-      return await callRpc<any>("contract_get", [address]);
-    } catch (e) {
-      return { address, note: "contract_get not implemented in placeholder" };
-    }
+    // Minimal contract info; use eth_getCode directly instead of any custom RPC
+    const code = await callRpc<any>("eth_getCode", [address, "latest"]).catch(() => null);
+    return { address, code };
   },
   getContractBytecode: async (address: string): Promise<string | null> => {
     try {
@@ -115,7 +110,7 @@ export const Lava = {
     try {
       return await callRpc<any>("token_metadata", [addressOrSymbol]);
     } catch {
-      return { symbol: addressOrSymbol, note: "token_metadata placeholder" };
+      return { symbol: addressOrSymbol };
     }
   },
   getPendingTransactions: async (limit = 50): Promise<any[]> => {

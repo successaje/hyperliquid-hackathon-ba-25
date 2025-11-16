@@ -17,6 +17,12 @@ export type ContractScanResult = {
     severity: "low" | "medium" | "high";
     detail?: string;
   }>;
+  similar?: Array<{
+    address: string;
+    similarity: number; // 0 - 100
+    label?: string;
+    risk?: "low" | "medium" | "high";
+  }>;
 };
 
 const BytecodeInfo = z.object({
@@ -82,6 +88,31 @@ async function detectErc20Anomalies(address: string): Promise<ContractScanResult
 }
 
 export async function scanContract(address: string): Promise<ContractScanResult> {
+  // Prefer the Slither-like backend if available, then enrich with runtime anomalies.
+  try {
+    const res = await fetch("/api/security/slither", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ address }),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as ContractScanResult;
+      const [anomalies, similar] = await Promise.all([
+        detectErc20Anomalies(address),
+        fetch("/api/security/similarity", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ address }),
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null),
+      ]);
+      return { ...data, anomalies, similar: similar?.similar ?? [] };
+    }
+  } catch {
+    // fall back to local heuristic scan
+  }
+
   const meta = await fetchContractBytecode(address);
   const anomalies = await detectErc20Anomalies(address);
 
