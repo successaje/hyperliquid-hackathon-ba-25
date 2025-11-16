@@ -38,6 +38,27 @@ export const Lava = {
       return [];
     }
   },
+  getAddress: async (address: string): Promise<any> => {
+    try {
+      return await callRpc<any>("address_get", [address]);
+    } catch (e) {
+      return { address, note: "address_get not implemented in placeholder" };
+    }
+  },
+  getTransaction: async (hash: string): Promise<any> => {
+    try {
+      return await callRpc<any>("tx_get", [hash]);
+    } catch (e) {
+      return { hash, note: "tx_get not implemented in placeholder" };
+    }
+  },
+  getContract: async (address: string): Promise<any> => {
+    try {
+      return await callRpc<any>("contract_get", [address]);
+    } catch (e) {
+      return { address, note: "contract_get not implemented in placeholder" };
+    }
+  },
 };
 
 
