@@ -4,16 +4,20 @@ import { useCallback, useRef } from "react";
 import { useExplorerStore } from "../lib/store";
 import { ExplorerBlock, ExplorerTx } from "../utils/types";
 import { Lava } from "../lib/lavaClient";
+import { RealtimeClient } from "../lib/realtime";
 
 export function useRealtime() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const { setBlocks, setTxs } = useExplorerStore();
+  const wsRef = useRef<RealtimeClient | null>(null);
+  const { setBlocks, setTxs, setPendingTxs, setMetrics } = useExplorerStore();
 
   const poll = useCallback(async () => {
     try {
-      const [rawBlocks, rawTxs] = await Promise.all([
+      const [rawBlocks, rawTxs, pending, metrics] = await Promise.all([
         Lava.getLatestBlocks(),
-        Lava.getLatestTransactions(),
+        Lava.getRecentTransactions(50),
+        Lava.getPendingTransactions(50),
+        Lava.getNetworkMetrics(),
       ]);
 
       const blocks: ExplorerBlock[] = Array.isArray(rawBlocks)
@@ -36,6 +40,14 @@ export function useRealtime() {
           }))
         : [];
 
+      const ptxs: ExplorerTx[] = Array.isArray(pending)
+        ? pending.map((t: any, i: number) => ({
+            hash: String(t.hash ?? t.tx_hash ?? t.id ?? `0xptx${i}`),
+            type: String(t.type ?? t.kind ?? "pending"),
+            timestamp: new Date().toISOString(),
+          }))
+        : [];
+
       if (!blocks.length && !txs.length) {
         const now = Date.now();
         const fallbackBlocks: ExplorerBlock[] = Array.from({ length: 10 }).map((_, i) => ({
@@ -55,22 +67,54 @@ export function useRealtime() {
 
       setBlocks(blocks);
       setTxs(txs);
+      setPendingTxs(ptxs);
+      setMetrics(metrics);
     } catch (e) {
       // swallow errors in polling
     }
-  }, [setBlocks, setTxs]);
+  }, [setBlocks, setTxs, setPendingTxs, setMetrics]);
 
   const start = useCallback(() => {
     if (timerRef.current) return;
+    // Try websocket
+    wsRef.current = new RealtimeClient({
+      onBlock: (b) => {
+        const block: ExplorerBlock = {
+          height: Number(b.height ?? b.number ?? 0),
+          hash: String(b.hash ?? b.block_hash ?? "0x"),
+          timestamp: new Date(Number(b.timestamp ?? Date.now())).toISOString(),
+        };
+        setBlocks([block]);
+      },
+      onTx: (t) => {
+        const tx: ExplorerTx = {
+          hash: String(t.hash ?? t.tx_hash ?? "0x"),
+          type: String(t.type ?? "tx"),
+          timestamp: new Date(Number(t.timestamp ?? Date.now())).toISOString(),
+        };
+        setTxs([tx]);
+      },
+      onPendingTx: (t) => {
+        const tx: ExplorerTx = {
+          hash: String(t.hash ?? t.tx_hash ?? "0x"),
+          type: "pending",
+          timestamp: new Date().toISOString(),
+        };
+        setPendingTxs([tx]);
+      },
+    });
+    try { wsRef.current.start(); } catch {}
     void poll();
     timerRef.current = setInterval(poll, 5_000);
-  }, [poll]);
+  }, [poll, setBlocks, setTxs, setPendingTxs]);
 
   const stop = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    wsRef.current?.stop();
+    wsRef.current = null;
   }, []);
 
   return { start, stop };

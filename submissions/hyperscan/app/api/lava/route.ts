@@ -8,7 +8,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "method required" }, { status: 400 });
     }
 
-    const envUrl = process.env.LAVA_HYPERLIQUID_RPC_URL;
+    const envUrl =
+      process.env.LAVA_HYPERLIQUID_RPC_URL ||
+      // Fallback default (Hyperliquid Testnet via Lava) – replace if you rotate keys
+      "https://g.w.lavanet.xyz:443/gateway/hyperliquidt/rpc-http/af11967a32eea0538aaadf6aadf4f5e0";
     const apiKey = process.env.LAVA_API_KEY;
     const url = envUrl || "";
     if (!url) {

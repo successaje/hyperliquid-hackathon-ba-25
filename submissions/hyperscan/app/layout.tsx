@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
 import { Header } from "../components/Header";
+import { Sidebar } from "../components/Sidebar";
+import { Footer } from "../components/Footer";
 
 export const metadata: Metadata = {
   title: "HyperScan",
@@ -12,13 +14,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-          <div className="min-h-screen flex flex-col">
-            <Header />
-            <main className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 flex-1">
-              {children}
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} themes={["light","dark"]}>
+          <Header />
+          <div className="min-h-screen flex">
+            <Sidebar />
+            <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6">
+              <div className="mx-auto max-w-7xl">{children}</div>
             </main>
           </div>
+          <Footer />
         </ThemeProvider>
       </body>
     </html>

@@ -12,21 +12,17 @@ const config: Config = {
     extend: {
       colors: {
         background: {
-          DEFAULT: "#0b0f17",
-          light: "#f7f8fb",
+          DEFAULT: "var(--color-bg)",
         },
         foreground: {
-          DEFAULT: "#e6edf3",
-          dark: "#101826"
+          DEFAULT: "var(--color-fg)",
         },
         primary: {
-          DEFAULT: "#6ee7ff",
-          dark: "#00bcd4"
+          DEFAULT: "var(--color-primary)",
         },
         accent: {
-          DEFAULT: "#a78bfa",
-          dark: "#7c3aed"
-        }
+          DEFAULT: "var(--color-accent)",
+        },
       },
       boxShadow: {
         soft: "0 10px 25px rgba(0,0,0,0.15)"

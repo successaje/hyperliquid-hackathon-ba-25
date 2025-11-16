@@ -4,18 +4,30 @@
 
 :root {
   color-scheme: dark light;
+  --color-bg: #f7f8fb;
+  --color-fg: #101826;
+  --color-primary: #00bcd4;
+  --color-accent: #7c3aed;
+  --color-surface: rgba(0,0,0,0.03);
+  --color-border: rgba(0,0,0,0.08);
+}
+
+.dark {
+  --color-bg: #0b0f17;
+  --color-fg: #e6edf3;
+  --color-primary: #6ee7ff;
+  --color-accent: #a78bfa;
+  --color-surface: rgba(255,255,255,0.06);
+  --color-border: rgba(255,255,255,0.08);
 }
 
 html, body {
   height: 100%;
 }
 
-body {
-  @apply bg-background text-foreground antialiased;
-}
+html { background-color: var(--color-bg); color: var(--color-fg); }
+body { @apply bg-background text-foreground antialiased transition-colors duration-200; }
 
-.card {
-  @apply rounded-xl border border-white/5 bg-white/5 backdrop-blur shadow-soft;
-}
+.card { @apply rounded-xl backdrop-blur shadow-soft; background: var(--color-surface); border: 1px solid var(--color-border); }
 
 
