@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Lava } from "../../../lib/lavaClient";
+import { ContractHealth } from "../../../components/contract/ContractHealth";
 
 export default function ContractPage() {
   const params = useParams();
@@ -42,6 +43,10 @@ export default function ContractPage() {
         {!loading && !error && (
           <pre className="text-xs overflow-auto">{JSON.stringify(data, null, 2)}</pre>
         )}
+      </div>
+      <div className="card p-4">
+        <h2 className="text-lg font-semibold mb-2">Contract Health</h2>
+        <ContractHealth address={addr} />
       </div>
     </div>
   );
